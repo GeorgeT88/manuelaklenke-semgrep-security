@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Semgrep SAST Report — manuelaklenke.com</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1100px; margin: 48px auto; padding: 0 24px; color: #2d2d2d; }
+    h1 { color: #1b2a4a; margin-bottom: 4px; }
+    .meta { color: #888; font-size: 0.9em; margin-bottom: 32px; }
+    .stats { display: flex; gap: 16px; margin-bottom: 32px; }
+    .stat { padding: 16px 24px; border-radius: 8px; text-align: center; min-width: 100px; }
+    .stat .num { font-size: 2em; font-weight: 700; }
+    .stat .lbl { font-size: 0.8em; color: #666; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 12px; background: #f4f4f4; font-size: 0.85em; color: #555; border-bottom: 2px solid #e0e0e0; }
+    td { padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <h1>Semgrep SAST Report</h1>
+  <p class="meta">Static analysis of manuelaklenke-web source code &mdash; powered by Semgrep OSS</p>
+  <div class="stats">
+    <div class="stat" style="background:#fdecea"><div class="num" style="color:#c0392b">1</div><div class="lbl">Errors</div></div>
+    <div class="stat" style="background:#fef6ec"><div class="num" style="color:#e67e22">0</div><div class="lbl">Warnings</div></div>
+    <div class="stat" style="background:#eaf4fb"><div class="num" style="color:#2980b9">0</div><div class="lbl">Info</div></div>
+    <div class="stat" style="background:#f4f4f4"><div class="num" style="color:#333">1</div><div class="lbl">Total</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Severity</th><th>Location</th><th>Rule</th><th>Message</th></tr></thead>
+    <tbody>
+  <tr style="background:#fdecea">
+    <td><span style="color:#c0392b;font-weight:600;font-size:0.8em">ERROR</span></td>
+    <td style="font-family:monospace;font-size:0.85em">src/lib/supabase.ts:5</td>
+    <td style="font-size:0.85em;color:#555">detected-jwt-token</td>
+    <td style="font-size:0.85em">JWT token detected</td>
+  </tr></tbody>
+  </table>
+</body>
+</html>
