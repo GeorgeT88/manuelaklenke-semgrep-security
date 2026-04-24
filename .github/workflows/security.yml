@@ -1,0 +1,165 @@
+name: Semgrep SAST Scan
+
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && 'Semgrep SAST Scan — manual run' ||
+      github.event_name == 'repository_dispatch' && 'Semgrep SAST Scan — triggered by Vercel deploy' ||
+      github.event_name == 'schedule' && 'Semgrep SAST Scan — nightly run' ||
+      'Semgrep SAST Scan' }}
+
+on:
+  repository_dispatch:
+    types: [vercel-deploy]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  semgrep:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Clone manuelaklenke-web
+        run: git clone https://github.com/GeorgeT88/manuelaklenke-web.git scan-web
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run Semgrep scan
+        continue-on-error: true
+        run: |
+          semgrep scan \
+            --config=p/default \
+            --config=p/javascript \
+            --config=p/react \
+            --config=p/typescript \
+            --json \
+            --output=semgrep.json \
+            scan-web/src || true
+
+      - name: Generate HTML report
+        if: always()
+        run: |
+          mkdir -p semgrep-report
+          touch semgrep-report/.nojekyll
+
+          if [ ! -f semgrep.json ]; then
+            echo '{"results":[],"errors":[]}' > semgrep.json
+          fi
+
+          FINDINGS=$(python3 -c "
+          import json, sys
+          with open('semgrep.json') as f:
+            data = json.load(f)
+          results = data.get('results', [])
+          print(len(results))
+          ")
+
+          python3 << 'PYEOF'
+          import json, html
+
+          with open('semgrep.json') as f:
+            data = json.load(f)
+
+          results = data.get('results', [])
+
+          severity_order = {'ERROR': 0, 'WARNING': 1, 'INFO': 2}
+          results.sort(key=lambda r: severity_order.get(r.get('extra', {}).get('severity', 'INFO'), 2))
+
+          severity_colors = {
+            'ERROR':   ('#c0392b', '#fdecea'),
+            'WARNING': ('#e67e22', '#fef6ec'),
+            'INFO':    ('#2980b9', '#eaf4fb'),
+          }
+
+          rows = ''
+          for r in results:
+            extra  = r.get('extra', {})
+            sev    = extra.get('severity', 'INFO')
+            color, bg = severity_colors.get(sev, ('#999', '#f9f9f9'))
+            path   = r.get('path', '').replace('scan-web/', '')
+            line   = r.get('start', {}).get('line', '')
+            rule   = r.get('check_id', '').split('.')[-1]
+            msg    = html.escape(extra.get('message', ''))
+            rows += f"""
+            <tr style="background:{bg}">
+              <td><span style="color:{color};font-weight:600;font-size:0.8em">{sev}</span></td>
+              <td style="font-family:monospace;font-size:0.85em">{html.escape(path)}:{line}</td>
+              <td style="font-size:0.85em;color:#555">{html.escape(rule)}</td>
+              <td style="font-size:0.85em">{msg}</td>
+            </tr>"""
+
+          total = len(results)
+          errors   = sum(1 for r in results if r.get('extra',{}).get('severity') == 'ERROR')
+          warnings = sum(1 for r in results if r.get('extra',{}).get('severity') == 'WARNING')
+          infos    = sum(1 for r in results if r.get('extra',{}).get('severity') == 'INFO')
+
+          empty_msg = '' if results else '<tr><td colspan="4" style="text-align:center;padding:32px;color:#999">No findings — clean scan</td></tr>'
+
+          page = f"""<!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8"/>
+            <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+            <title>Semgrep SAST Report — manuelaklenke.com</title>
+            <style>
+              body {{ font-family: sans-serif; max-width: 1100px; margin: 48px auto; padding: 0 24px; color: #2d2d2d; }}
+              h1 {{ color: #1b2a4a; margin-bottom: 4px; }}
+              .meta {{ color: #888; font-size: 0.9em; margin-bottom: 32px; }}
+              .stats {{ display: flex; gap: 16px; margin-bottom: 32px; }}
+              .stat {{ padding: 16px 24px; border-radius: 8px; text-align: center; min-width: 100px; }}
+              .stat .num {{ font-size: 2em; font-weight: 700; }}
+              .stat .lbl {{ font-size: 0.8em; color: #666; }}
+              table {{ width: 100%; border-collapse: collapse; }}
+              th {{ text-align: left; padding: 10px 12px; background: #f4f4f4; font-size: 0.85em; color: #555; border-bottom: 2px solid #e0e0e0; }}
+              td {{ padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: top; }}
+            </style>
+          </head>
+          <body>
+            <h1>Semgrep SAST Report</h1>
+            <p class="meta">Static analysis of manuelaklenke-web source code &mdash; powered by Semgrep OSS</p>
+            <div class="stats">
+              <div class="stat" style="background:#fdecea"><div class="num" style="color:#c0392b">{errors}</div><div class="lbl">Errors</div></div>
+              <div class="stat" style="background:#fef6ec"><div class="num" style="color:#e67e22">{warnings}</div><div class="lbl">Warnings</div></div>
+              <div class="stat" style="background:#eaf4fb"><div class="num" style="color:#2980b9">{infos}</div><div class="lbl">Info</div></div>
+              <div class="stat" style="background:#f4f4f4"><div class="num" style="color:#333">{total}</div><div class="lbl">Total</div></div>
+            </div>
+            <table>
+              <thead><tr><th>Severity</th><th>Location</th><th>Rule</th><th>Message</th></tr></thead>
+              <tbody>{rows}{empty_msg}</tbody>
+            </table>
+          </body>
+          </html>"""
+
+          with open('semgrep-report/index.html', 'w') as f:
+            f.write(page)
+
+          print(f"Report generated: {total} findings ({errors} errors, {warnings} warnings, {infos} info)")
+          PYEOF
+
+      - name: Write scan summary
+        if: always()
+        run: |
+          TOTAL=$(python3 -c "import json; d=json.load(open('semgrep.json')); print(len(d.get('results',[])))" 2>/dev/null || echo "0")
+          echo "## Semgrep SAST Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** manuelaklenke-web/src" >> $GITHUB_STEP_SUMMARY
+          echo "**Rulesets:** p/default, p/javascript, p/react, p/typescript" >> $GITHUB_STEP_SUMMARY
+          echo "**Findings:** $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 [View full Semgrep report](https://georget88.github.io/manuelaklenke-semgrep-security/)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Publish Semgrep report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./semgrep-report
+          destination_dir: .
