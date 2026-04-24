@@ -40,7 +40,7 @@ Semgrep checks source code for:
 
 ## ⚙️ CI/CD Pipeline
 
-The scan is triggered automatically by [GeorgeT88/manuelaklenke-web](https://github.com/GeorgeT88/manuelaklenke-web) after every push to `main`, once all E2E tests and the Snyk scan have completed:
+The scan is triggered automatically by [GeorgeT88/manuelaklenke-web](https://github.com/GeorgeT88/manuelaklenke-web) after every push to `main`, once all E2E tests have completed. Semgrep runs in parallel with Snyk SCA:
 
 ```
 📦 Push to manuelaklenke-web
@@ -49,9 +49,9 @@ The scan is triggered automatically by [GeorgeT88/manuelaklenke-web](https://git
         ↓
 🎭 Playwright + 🔬 Selenium + 🌲 Cypress (parallel)
         ↓
-🔒 Snyk Dependency Scan
+🛡️ OWASP ZAP — skipped (manual/nightly only)
         ↓
-⚡ repository_dispatch: vercel-deploy
+⚡ repository_dispatch: vercel-deploy  ←─ Semgrep + Snyk triggered in parallel
         ↓
 🔎 Semgrep scans manuelaklenke-web/src
         ↓
